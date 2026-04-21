@@ -85,15 +85,31 @@ import { Subject } from 'rxjs';
               </div>
             </div>
           } @else if (showWebcam()) {
-            <div class="webcam-wrap">
-              <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)" (initError)="handleInitError($event)"></webcam>
-              <div class="preview-actions">
-                <button class="preview-btn" type="button" (click)="showWebcam.set(false)">
-                  <i class="ph-bold ph-x"></i> Cancel
+            <div class="camera-view">
+              <webcam
+                [trigger]="triggerObservable"
+                (imageCapture)="handleImage($event)"
+                (initError)="handleInitError($event)"
+                [videoOptions]="videoOptions"
+              ></webcam>
+              <div class="camera-controls">
+                <button
+                  class="btn-cancel-cam"
+                  type="button"
+                  (click)="showWebcam.set(false)"
+                  [attr.aria-label]="t().create.cancelCamera"
+                >
+                  <i class="ph-bold ph-x"></i>
                 </button>
-                <button class="preview-btn" type="button" (click)="triggerSubject.next()">
-                  <i class="ph ph-camera"></i> Snap
+                <button
+                  class="btn-shutter"
+                  type="button"
+                  (click)="triggerSubject.next()"
+                  [attr.aria-label]="t().create.shutterLabel"
+                >
+                  <span class="shutter-inner"></span>
                 </button>
+                <div class="cam-spacer"></div>
               </div>
             </div>
           } @else {
@@ -199,21 +215,60 @@ import { Subject } from 'rxjs';
       overflow: hidden;
       border: 2px solid #6366f1;
     }
-    .webcam-wrap {
+    .camera-view {
       position: relative;
       border-radius: 1.25rem;
       overflow: hidden;
-      border: 2px solid #e2e8f0;
+      border: 2px solid #1e293b;
       background: #000;
+      aspect-ratio: 4/3;
       display: flex;
-      justify-content: center;
+      align-items: stretch;
+    }
+    .camera-view webcam { flex: 1; display: flex; }
+    ::ng-deep .camera-view webcam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .camera-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0; right: 0;
+      padding: 1rem 1.5rem;
+      display: flex;
       align-items: center;
-      min-height: 200px;
+      justify-content: space-between;
+      background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 100%);
     }
-    .webcam-wrap webcam {
-      position: relative;
-      z-index: 1;
+    .btn-shutter {
+      width: 4.5rem; height: 4.5rem;
+      border-radius: 50%;
+      border: 4px solid white;
+      background: transparent;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
+      transition: transform 0.1s;
     }
+    .btn-shutter:active { transform: scale(0.92); }
+    .shutter-inner {
+      width: 3.25rem; height: 3.25rem;
+      border-radius: 50%;
+      background: white;
+      transition: background 0.1s;
+    }
+    .btn-shutter:active .shutter-inner { background: #e2e8f0; }
+    .btn-cancel-cam {
+      width: 2.75rem; height: 2.75rem;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(4px);
+      color: white;
+      font-size: 1.25rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-cancel-cam:hover { background: rgba(255,255,255,0.3); }
+    .cam-spacer { width: 2.75rem; }
     .preview-img {
       width: 100%;
       aspect-ratio: 16/10;
@@ -288,6 +343,7 @@ export class CreateSwagComponent {
 
   readonly triggerSubject = new Subject<void>();
   readonly showWebcam = signal(false);
+  readonly videoOptions: MediaTrackConstraints = { facingMode: { ideal: 'environment' } };
 
   get triggerObservable() {
     return this.triggerSubject.asObservable();

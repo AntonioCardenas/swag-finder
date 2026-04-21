@@ -30,13 +30,10 @@ service cloud.firestore {
 
       allow update: if isSignedIn()
         && (
-          // Claim: swag must be unclaimed & not expired; claimer sets their own uid
-          (resource.data.claimed == false
-            && resource.data.get('expired', false) == false
-            && request.resource.data.claimed == true
-            && request.resource.data.claimedBy == request.auth.uid
+          // Claim: not expired; only claims array, lastClaimedAt and claimed flag change
+          (resource.data.get('expired', false) == false
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['claimed', 'claimedBy', 'claimedByName', 'claimedAt'])
+                 .hasOnly(['claimed', 'claims', 'lastClaimedAt'])
           )
           ||
           // Any authenticated user can report unclaimed swag as no longer available

@@ -1,3 +1,9 @@
+export interface ClaimRecord {
+  uid: string;
+  name: string;
+  claimedAt: Date;
+}
+
 export interface SwagItem {
   id: string;
   title: string;
@@ -5,9 +11,8 @@ export interface SwagItem {
   imageUrl: string;
   location: string;
   claimed: boolean;
-  claimedBy: string | null;
-  claimedByName: string | null;
-  claimedAt: Date | null;
+  claims: ClaimRecord[];
+  lastClaimedAt: Date | null;
   createdBy: string;
   createdByName: string;
   createdAt: Date;

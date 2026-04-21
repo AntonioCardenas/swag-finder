@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   increment,
+  arrayUnion,
   Timestamp,
   getDoc,
   onSnapshot,
@@ -55,9 +56,8 @@ export class SwagService {
       imageUrl,
       location: data.location,
       claimed: false,
-      claimedBy: null,
-      claimedByName: null,
-      claimedAt: null,
+      claims: [],
+      lastClaimedAt: null,
       createdBy: uid,
       createdByName: displayName,
       createdAt: serverTimestamp(),
@@ -66,22 +66,28 @@ export class SwagService {
     await updateDoc(doc(db, 'users', uid), { createdCount: increment(1) });
   }
 
-  async claimSwag(swagId: string): Promise<void> {
+  async claimSwag(swagId: string): Promise<'ok' | 'already_yours' | 'unavailable'> {
     const uid = this.auth.uid()!;
     const displayName = this.auth.displayName();
 
     const swagRef = doc(db, this.EVENT_NAME, swagId);
     const snap = await getDoc(swagRef);
-    if (!snap.exists() || snap.data()['claimed']) return;
+
+    if (!snap.exists()) return 'unavailable';
+    const data = snap.data();
+    if (data['expired']) return 'unavailable';
+
+    const existing = (data['claims'] as Array<{ uid: string }>) ?? [];
+    if (existing.some((c) => c.uid === uid)) return 'already_yours';
 
     await updateDoc(swagRef, {
       claimed: true,
-      claimedBy: uid,
-      claimedByName: displayName,
-      claimedAt: serverTimestamp(),
+      claims: arrayUnion({ uid, name: displayName, claimedAt: Timestamp.now() }),
+      lastClaimedAt: serverTimestamp(),
     });
 
     await updateDoc(doc(db, 'users', uid), { claimedCount: increment(1) });
+    return 'ok';
   }
 
   async expireSwag(swagId: string): Promise<void> {
@@ -104,10 +110,11 @@ export class SwagService {
       description: data['description'] as string,
       imageUrl: data['imageUrl'] as string,
       location: data['location'] as string,
-      claimed: data['claimed'] as boolean,
-      claimedBy: (data['claimedBy'] as string) ?? null,
-      claimedByName: (data['claimedByName'] as string) ?? null,
-      claimedAt: toDate(data['claimedAt']),
+      claimed: (data['claimed'] as boolean) ?? false,
+      claims: ((data['claims'] as Array<{ uid: string; name: string; claimedAt: unknown }>) ?? []).map(
+        (c) => ({ uid: c.uid, name: c.name, claimedAt: toDate(c.claimedAt) ?? new Date() }),
+      ),
+      lastClaimedAt: toDate(data['lastClaimedAt']),
       createdBy: data['createdBy'] as string,
       createdByName: data['createdByName'] as string,
       createdAt: toDate(data['createdAt']) ?? new Date(),

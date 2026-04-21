@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "deploy": "ng build --configuration production && firebase deploy"
   },
   "prettier": {
     "printWidth": 100,
@@ -35,8 +36,7 @@
     "ngx-webcam": "^0.4.1",
     "rxjs": "~7.8.0",
     "tailwindcss": "^4.2.4",
-    "tslib": "^2.3.0",
-    "webcam-easy": "^1.1.1"
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
     "@angular/build": "^21.0.5",

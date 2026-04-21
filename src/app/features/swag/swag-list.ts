@@ -93,18 +93,39 @@ import { SwagItem } from '../../core/models/swag.model';
                   </div>
                   <p class="swag-desc">{{ item.description }}</p>
 
+                  @if (item.claims.length > 0) {
+                    <div class="claim-stats">
+                      <i class="ph ph-users" aria-hidden="true"></i>
+                      <span>{{ item.claims.length }} {{ t().swag.peopleClaimed }}</span>
+                      @if (item.lastClaimedAt) {
+                        <span class="last-claim-time">· {{ t().swag.lastClaimed }} {{ timeAgo(item.lastClaimedAt) }}</span>
+                      }
+                    </div>
+                  }
+
+                  @if (claimWarning()?.id === item.id) {
+                    <div
+                      class="claim-warning"
+                      [class.warn-yours]="claimWarning()?.reason === 'already_yours'"
+                      [class.warn-unavailable]="claimWarning()?.reason === 'unavailable'"
+                      role="alert"
+                    >
+                      <i class="ph-bold ph-warning"></i>
+                      {{ claimWarning()?.reason === 'already_yours' ? t().swag.warnAlreadyYours : t().swag.warnUnavailable }}
+                    </div>
+                  }
+
                   <div class="swag-footer">
                     @if (item.expired) {
                       <span class="expired-label">{{ t().swag.expiredBadge }}</span>
-                    } @else if (item.claimed) {
-                      <div class="claimer-info">
-                        <span class="claimer-label">{{ t().swag.claimedBy }}</span>
-                        <span class="claimer-name">{{ item.claimedByName }}</span>
-                      </div>
                     } @else if (isAnonymous()) {
                       <a routerLink="/login" class="btn-claim-guest" [attr.aria-label]="t().swag.signInToClaim">
                         {{ t().swag.signInToClaim }}
                       </a>
+                    } @else if (hasUserClaimed(item)) {
+                      <span class="you-claimed">
+                        <i class="ph-bold ph-check-circle"></i> {{ t().swag.youClaimed }}
+                      </span>
                     } @else {
                       <button
                         class="btn-claim"
@@ -116,7 +137,7 @@ import { SwagItem } from '../../core/models/swag.model';
                       </button>
                     }
 
-                    @if (!isAnonymous() && !item.claimed && !item.expired) {
+                    @if (!isAnonymous() && !item.expired) {
                       <button
                         class="btn-expire"
                         (click)="expire(item)"
@@ -312,7 +333,43 @@ import { SwagItem } from '../../core/models/swag.model';
       align-items: center;
       gap: 0.375rem;
     }
-    .swag-desc { font-size: 0.9375rem; color: #475569; margin: 0; flex: 1; line-height: 1.5; }
+    .swag-desc { font-size: 0.9375rem; color: #475569; margin: 0; line-height: 1.5; }
+
+    .claim-stats {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+    .last-claim-time { color: #94a3b8; }
+    .you-claimed {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #10b981;
+    }
+
+    .claim-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 0.25rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .claim-warning i { flex-shrink: 0; margin-top: 0.0625rem; }
+    .warn-yours { background: #fef3c7; color: #92400e; }
+    .warn-unavailable { background: #f1f5f9; color: #475569; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
     .swag-footer {
       display: flex;
@@ -321,9 +378,6 @@ import { SwagItem } from '../../core/models/swag.model';
       gap: 1rem;
       margin-top: 0.5rem;
     }
-    .claimer-info { display: flex; flex-direction: column; }
-    .claimer-label { font-size: 0.75rem; color: #64748b; font-weight: 600; }
-    .claimer-name { font-size: 0.9375rem; color: #10b981; font-weight: 700; }
     .expired-label { font-size: 0.875rem; color: #94a3b8; font-weight: 700; }
 
     .btn-claim {
@@ -421,6 +475,7 @@ export class SwagListComponent implements OnInit {
   readonly filter = signal<'all' | 'available' | 'claimed'>('all');
   readonly claiming = signal<string | null>(null);
   readonly swagList = signal<SwagItem[] | null>(null);
+  readonly claimWarning = signal<{ id: string; reason: 'already_yours' | 'unavailable' } | null>(null);
 
   readonly filteredList = computed(() => {
     const list = this.swagList();
@@ -430,6 +485,22 @@ export class SwagListComponent implements OnInit {
     return list;
   });
 
+  hasUserClaimed(item: import('../../core/models/swag.model').SwagItem): boolean {
+    const uid = this.uid();
+    return uid ? item.claims.some((c) => c.uid === uid) : false;
+  }
+
+  timeAgo(date: Date | null): string {
+    if (!date) return '';
+    const sec = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (sec < 60) return 'just now';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    return `${Math.floor(hr / 24)}d ago`;
+  }
+
   ngOnInit(): void {
     this.swagService.getSwagList().subscribe((items) => this.swagList.set(items));
   }
@@ -437,8 +508,13 @@ export class SwagListComponent implements OnInit {
   async claim(item: SwagItem): Promise<void> {
     if (this.claiming()) return;
     this.claiming.set(item.id);
+    this.claimWarning.set(null);
     try {
-      await this.swagService.claimSwag(item.id);
+      const result = await this.swagService.claimSwag(item.id);
+      if (result !== 'ok') {
+        this.claimWarning.set({ id: item.id, reason: result as 'already_yours' | 'unavailable' });
+        setTimeout(() => this.claimWarning.set(null), 4000);
+      }
     } finally {
       this.claiming.set(null);
     }
