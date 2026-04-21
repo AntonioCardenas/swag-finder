@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // True only for Google-authenticated users (not anonymous guests)
+    function isSignedIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // ── Swag items ────────────────────────────────────────────────────────────
+    match /next26/{swagId} {
+
+      // Public read – anyone can browse
+      allow read: if true;
+
+      // Only real (non-anonymous) users can post swag
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.claimed == false
+        && request.resource.data.claimedBy == null
+        && request.resource.data.claimedByName == null
+        && request.resource.data.claimedAt == null
+        && request.resource.data.keys().hasAll([
+             'title', 'description', 'imageUrl', 'location',
+             'claimed', 'claimedBy', 'claimedByName', 'claimedAt',
+             'createdBy', 'createdByName', 'createdAt'
+           ]);
+
+      allow update: if isSignedIn()
+        && (
+          // Claim: swag must be unclaimed & not expired; claimer sets their own uid
+          (resource.data.claimed == false
+            && resource.data.get('expired', false) == false
+            && request.resource.data.claimed == true
+            && request.resource.data.claimedBy == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['claimed', 'claimedBy', 'claimedByName', 'claimedAt'])
+          )
+          ||
+          // Any authenticated user can report unclaimed swag as no longer available
+          (resource.data.claimed == false
+            && request.resource.data.expired == true
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['expired'])
+          )
+        );
+
+      // No one can delete swag
+      allow delete: if false;
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    match /users/{userId} {
+
+      // Public read – needed for the leaderboard
+      allow read: if true;
+
+      // Profile is created once on first Google sign-in
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasAll([
+             'uid', 'displayName', 'email', 'photoURL',
+             'claimedCount', 'createdCount', 'createdAt'
+           ]);
+
+      // Owners can only increment their own counters
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['createdCount', 'claimedCount']);
+
+      // No one can delete user profiles
+      allow delete: if false;
+    }
+  }
+}

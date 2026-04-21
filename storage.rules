@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Swag images — public read, owner-only write
+    match /swag/{userId}/{fileName} {
+
+      // Anyone can view swag images (needed for unauthenticated / guest browsing)
+      allow read: if true;
+
+      // Only the authenticated, non-anonymous user who owns the folder can upload
+      allow create: if request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024        // 10 MB max
+        && request.resource.contentType.matches('image/.*');
+
+      // No updates or deletes through the client
+      allow update, delete: if false;
+    }
+  }
+}
