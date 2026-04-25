@@ -1,5 +1,9 @@
 # SwagFinder
 
+![Build Status](https://github.com/AntonioCardenas/swag-finder/actions/workflows/firebase-hosting-merge.yml/badge.svg)
+![Version](https://img.shields.io/github/package-json/v/AntonioCardenas/swag-finder)
+![Status](https://img.shields.io/badge/status-active-success)
+
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.5.
 
 ## Development server
